@@ -105,16 +105,13 @@ describe("translateStream handler", () => {
     vi.restoreAllMocks();
   });
 
-  it("calls Ollama API with stream: true and returns a Response", async () => {
-    const ndjsonBody = '{"response":"Hallo","done":false}\n{"response":"","done":true}\n';
-
+  it("calls LM Studio API with stream: true and returns a Response", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
         body: new ReadableStream({
           start(controller) {
-            controller.enqueue(new TextEncoder().encode(ndjsonBody));
             controller.close();
           },
         }),
@@ -126,14 +123,18 @@ describe("translateStream handler", () => {
     })) as Response;
 
     expect(result).toBeInstanceOf(Response);
-    expect(result.headers.get("Content-Type")).toBe("application/x-ndjson");
+    expect(result.headers.get("Content-Type")).toBe("text/event-stream");
 
-    // Verify fetch was called with stream: true
+    // Verify fetch was called with correct URL and body
     const [url, options] = (fetch as Mock).mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:11434/api/generate");
+    expect(url).toBe("http://localhost:1234/v1/chat/completions");
+    expect(options.method).toBe("POST");
     const body = JSON.parse(options.body as string) as Record<string, unknown>;
     expect(body["stream"]).toBe(true);
-    expect(body["model"]).toBe("translategemma:27b");
+    expect(body["model"]).toBe("google/translategemma-27b-it");
+    expect(body["messages"]).toEqual([
+      { role: "user", content: expect.stringContaining("Hello") },
+    ]);
   });
 
   it("throws on non-200 API response", async () => {
@@ -150,7 +151,7 @@ describe("translateStream handler", () => {
       capturedHandler({
         data: { text: "Hello", sourceLanguage: "en", targetLanguage: "de_DE" },
       })
-    ).rejects.toThrow("Ollama API error: 500 - Internal Server Error");
+    ).rejects.toThrow("LM Studio API error: 500 - Internal Server Error");
   });
 
   it("uses custom model when provided", async () => {

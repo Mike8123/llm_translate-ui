@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { buildTranslationPrompt } from "~/lib/prompt";
 
-const OLLAMA_URL = process.env["OLLAMA_URL"] ?? "http://localhost:11434";
-const DEFAULT_MODEL = process.env["DEFAULT_MODEL"] ?? "translategemma:27b";
+const LM_STUDIO_URL = process.env["LM_STUDIO_URL"] ?? "http://localhost:1234";
+const DEFAULT_MODEL = process.env["DEFAULT_MODEL"] ?? "google/translategemma-27b-it";
 
 interface TranslateInput {
   text: string;
@@ -46,27 +46,25 @@ export const translateStream = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const prompt = buildTranslationPrompt(data.text, data.sourceLanguage, data.targetLanguage);
 
-    const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+    const response = await fetch(`${LM_STUDIO_URL}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: data.model ?? DEFAULT_MODEL,
-        prompt,
+        messages: [{ role: "user", content: prompt }],
         stream: true,
-        options: {
-          temperature: 0.1,
-          num_predict: 4096,
-        },
+        temperature: 0.1,
+        max_tokens: 4096,
       }),
       signal: AbortSignal.timeout(300_000),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Ollama API error: ${String(response.status)} - ${errorText}`);
+      throw new Error(`LM Studio API error: ${String(response.status)} - ${errorText}`);
     }
 
     return new Response(response.body, {
-      headers: { "Content-Type": "application/x-ndjson" },
+      headers: { "Content-Type": "text/event-stream" },
     });
   });

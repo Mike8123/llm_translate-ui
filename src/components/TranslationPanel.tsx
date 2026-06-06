@@ -1,8 +1,10 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
 import { LanguageSelector, loadRecents, addToRecents, saveRecents } from "./LanguageSelector";
+import { ModelSelector } from "./ModelSelector";
 import { useStreamingTranslation } from "~/hooks/useStreamingTranslation";
 import { VALID_LANGUAGE_CODES } from "~/lib/languages";
 import { useLabel } from "~/context/LabelContext";
+import { useModel } from "~/context/ModelContext";
 
 /** Default recent language codes; exported for tests. */
 export const DEFAULT_SOURCE_RECENTS = ["en", "fr_FR", "de_DE", "es_MX"] as const;
@@ -25,6 +27,8 @@ export function TranslationPanel() {
   const titleCopy = useLabel("title.copy");
   const titleCopied = useLabel("title.copied");
 
+  const { selectedModel } = useModel();
+
   const {
     translatedText,
     setTranslatedText,
@@ -34,7 +38,7 @@ export function TranslationPanel() {
     setStats,
     startTranslation,
     abort,
-  } = useStreamingTranslation();
+  } = useStreamingTranslation(selectedModel);
 
   const [isWideView, setIsWideView] = useState(false);
   useEffect(() => {
@@ -230,7 +234,12 @@ export function TranslationPanel() {
       className="mx-auto w-full max-w-5xl transition-opacity duration-300 ease-out"
       style={{ opacity: hydrated ? 1 : 0 }}
     >
-      <div ref={languageRowRef} className="mb-3 flex items-center gap-3">
+      {/* Model selector row — full-width on mobile, inline on desktop */}
+      <div className="mb-3 flex items-center justify-end gap-3">
+        <ModelSelector />
+      </div>
+
+      <div ref={languageRowRef} className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <LanguageSelector
             value={sourceLanguage}

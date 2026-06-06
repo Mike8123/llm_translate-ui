@@ -6,15 +6,15 @@ services:
     container_name: translategemma-ui
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "7332:3000"
     environment:
       - NODE_ENV=production
-      - OLLAMA_URL=http://host.docker.internal:11434
-      - DEFAULT_MODEL=translategemma:27b
+      - LM_STUDIO_URL=http://192.168.1.42:1234
+      - DEFAULT_MODEL=google/translategemma-27b-it
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000"]
       interval: 30s
       timeout: 10s
       retries: 3

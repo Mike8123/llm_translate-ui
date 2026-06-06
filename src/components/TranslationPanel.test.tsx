@@ -8,7 +8,7 @@ vi.mock("~/serverFunctions/translateStream", () => ({
   translateStream: (...args: unknown[]) => mockTranslateStream(...args) as unknown,
 }));
 
-/** Build a Response whose body is an NDJSON stream Ollama-style. */
+/** Build a Response whose body is an SSE stream OpenAI-style. */
 function mockStreamResponse(
   translation: string,
   stats?: { total_duration?: number; eval_count?: number; eval_duration?: number }

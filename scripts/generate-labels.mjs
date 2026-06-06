@@ -1,6 +1,6 @@
 /**
  * Generates static translations of all UI labels for every supported language.
- * Calls the local Ollama API once per language with all labels batched.
+ * Calls the local LM Studio OpenAI-compatible API once per language with all labels batched.
  *
  * Usage: node scripts/generate-labels.mjs
  * Output: src/lib/translatedLabels.ts
@@ -13,8 +13,8 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 
-const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
-const MODEL = process.env.DEFAULT_MODEL || "translategemma:27b";
+const LM_STUDIO_URL = process.env.LM_STUDIO_URL || "http://localhost:1234";
+const MODEL = process.env.DEFAULT_MODEL || "google/translategemma-27b-it";
 const DELIMITER = "\n---\n";
 
 // Parse DEFAULT_LABELS from the source of truth (labels.ts)
@@ -40,14 +40,14 @@ Produce only the ${lang.name} translation, without any additional explanations o
 
 ${combined}`;
 
-  const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+  const response = await fetch(`${LM_STUDIO_URL}/v1/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
-      prompt,
-      stream: false,
-      options: { temperature: 0.1, num_predict: 4096 },
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.1,
+      max_tokens: 4096,
     }),
     signal: AbortSignal.timeout(300_000),
   });
@@ -58,7 +58,8 @@ ${combined}`;
   }
 
   const result = await response.json();
-  const translations = result.response
+  const content = result.choices?.[0]?.message?.content ?? "";
+  const translations = content
     .trim()
     .split(DELIMITER)
     .map((s) => s.trim());

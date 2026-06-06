@@ -1,13 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { translateStream } from "~/serverFunctions/translateStream";
 
-interface OllamaStreamLine {
-  response?: string;
-  done?: boolean;
-  model?: string;
-  total_duration?: number;
-  eval_count?: number;
-  eval_duration?: number;
+interface OpenAIStreamDelta {
+  content?: string;
+}
+
+interface OpenAIStreamChoice {
+  index: number;
+  delta: OpenAIStreamDelta;
+  finish_reason: string | null;
+}
+
+interface OpenAIStreamEvent {
+  choices: OpenAIStreamChoice[];
 }
 
 interface Stats {
@@ -15,14 +20,7 @@ interface Stats {
   tokens?: number;
 }
 
-function parseFinalStats(parsed: OllamaStreamLine): Stats | null {
-  if (parsed.total_duration === undefined) return null;
-  const stats: Stats = { duration: Math.round(parsed.total_duration / 1_000_000_000) };
-  if (parsed.eval_count !== undefined) stats.tokens = parsed.eval_count;
-  return stats;
-}
-
-export function useStreamingTranslation() {
+export function useStreamingTranslation(selectedModel?: string) {
   const [translatedText, setTranslatedText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +28,12 @@ export function useStreamingTranslation() {
 
   const controllerRef = useRef<AbortController | null>(null);
   const rafRef = useRef<number>(0);
+  const modelRef = useRef(selectedModel);
+
+  // Always keep the latest model in a ref so startTranslation reads it
+  useEffect(() => {
+    modelRef.current = selectedModel;
+  }, [selectedModel]);
 
   const abort = useCallback(() => {
     if (controllerRef.current) {
@@ -59,7 +63,7 @@ export function useStreamingTranslation() {
       void (async () => {
         try {
           const response = await translateStream({
-            data: { text, sourceLanguage, targetLanguage },
+            data: { text, sourceLanguage, targetLanguage, model: modelRef.current ?? undefined },
             signal: controller.signal,
           });
 
@@ -85,28 +89,31 @@ export function useStreamingTranslation() {
 
             buffer += decoder.decode(value, { stream: true });
 
-            // Process complete NDJSON lines
+            // Process SSE lines — each line is "data: {...}" or "[DONE]"
             const lines = buffer.split("\n");
             buffer = lines.pop() ?? "";
 
             for (const line of lines) {
               const trimmed = line.trim();
-              if (!trimmed) continue;
+              if (!trimmed || trimmed === "[DONE]") continue;
 
-              let parsed: OllamaStreamLine;
+              // Strip SSE data: prefix
+              let jsonStr = trimmed;
+              if (jsonStr.startsWith("data:")) {
+                jsonStr = jsonStr.slice(5).trim();
+              }
+              if (!jsonStr) continue;
+
+              let parsed: OpenAIStreamEvent;
               try {
-                parsed = JSON.parse(trimmed) as OllamaStreamLine;
+                parsed = JSON.parse(jsonStr) as OpenAIStreamEvent;
               } catch {
                 continue;
               }
 
-              if (parsed.response) {
-                accumulated += parsed.response;
-              }
-
-              if (parsed.done) {
-                const finalStats = parseFinalStats(parsed);
-                if (finalStats) setStats(finalStats);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                accumulated += content;
               }
             }
 
@@ -114,22 +121,6 @@ export function useStreamingTranslation() {
             if (!pendingUpdate) {
               pendingUpdate = true;
               rafRef.current = requestAnimationFrame(flushUpdate);
-            }
-          }
-
-          // Flush any remaining buffer
-          if (buffer.trim()) {
-            try {
-              const parsed = JSON.parse(buffer.trim()) as OllamaStreamLine;
-              if (parsed.response) {
-                accumulated += parsed.response;
-              }
-              if (parsed.done) {
-                const finalStats = parseFinalStats(parsed);
-                if (finalStats) setStats(finalStats);
-              }
-            } catch {
-              // Ignore malformed trailing data
             }
           }
 

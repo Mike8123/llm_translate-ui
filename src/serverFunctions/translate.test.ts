@@ -138,14 +138,12 @@ describe("translate handler", () => {
     vi.restoreAllMocks();
   });
 
-  it("calls Ollama API and returns translation", async () => {
+  it("calls LM Studio API and returns translation", async () => {
     const mockResponse = {
-      model: "translategemma:27b",
-      response: "  Hallo Welt  ",
-      done: true,
-      total_duration: 5000000000,
-      eval_count: 10,
-      eval_duration: 3000000000,
+      model: "google/translategemma-27b-it",
+      choices: [
+        { index: 0, message: { role: "assistant", content: "  Hallo Welt  " }, finish_reason: "stop" },
+      ],
     };
 
     vi.stubGlobal(
@@ -162,27 +160,24 @@ describe("translate handler", () => {
 
     expect(result).toEqual({
       translation: "Hallo Welt",
-      model: "translategemma:27b",
-      stats: {
-        totalDuration: 5000000000,
-        evalCount: 10,
-        evalDuration: 3000000000,
-      },
+      model: "google/translategemma-27b-it",
+      stats: null,
     });
 
     // Verify fetch was called with correct URL and body
     expect(fetch).toHaveBeenCalledOnce();
     const [url, options] = (fetch as Mock).mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:11434/api/generate");
+    expect(url).toBe("http://localhost:1234/v1/chat/completions");
     expect(options.method).toBe("POST");
     expect(options.headers).toEqual({ "Content-Type": "application/json" });
 
     const body = JSON.parse(options.body as string) as Record<string, unknown>;
-    expect(body["model"]).toBe("translategemma:27b");
-    expect(body["stream"]).toBe(false);
-    expect((body["options"] as Record<string, unknown>)["temperature"]).toBe(0.1);
-    expect((body["options"] as Record<string, unknown>)["num_predict"]).toBe(4096);
-    expect(body["prompt"]).toContain("Hello World");
+    expect(body["model"]).toBe("google/translategemma-27b-it");
+    expect(body["messages"]).toEqual([
+      { role: "user", content: expect.stringContaining("Hello World") },
+    ]);
+    expect((body["temperature"] as number)).toBe(0.1);
+    expect((body["max_tokens"] as number)).toBe(4096);
   });
 
   it("uses custom model when provided", async () => {
@@ -193,8 +188,7 @@ describe("translate handler", () => {
         json: () =>
           Promise.resolve({
             model: "custom-model",
-            response: "translated",
-            done: true,
+            choices: [{ index: 0, message: { role: "assistant", content: "translated" }, finish_reason: null }],
           }),
       })
     );
@@ -228,7 +222,7 @@ describe("translate handler", () => {
       capturedHandler({
         data: { text: "Hello", sourceLanguage: "en", targetLanguage: "de_DE" },
       })
-    ).rejects.toThrow("Ollama API error: 500 - Internal Server Error");
+    ).rejects.toThrow("LM Studio API error: 500 - Internal Server Error");
   });
 
   it("throws on network error", async () => {
@@ -248,9 +242,8 @@ describe("translate handler", () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            model: "translategemma:27b",
-            response: "result",
-            done: true,
+            model: "google/translategemma-27b-it",
+            choices: [{ index: 0, message: { role: "assistant", content: "result" }, finish_reason: null }],
           }),
       })
     );
@@ -263,16 +256,15 @@ describe("translate handler", () => {
     expect(options.signal).toBeInstanceOf(AbortSignal);
   });
 
-  it("handles response with missing optional stats", async () => {
+  it("handles response with empty choices", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
         json: () =>
           Promise.resolve({
-            model: "translategemma:27b",
-            response: "translated text",
-            done: true,
+            model: "google/translategemma-27b-it",
+            choices: [],
           }),
       })
     );
@@ -282,13 +274,9 @@ describe("translate handler", () => {
     });
 
     expect(result).toEqual({
-      translation: "translated text",
-      model: "translategemma:27b",
-      stats: {
-        totalDuration: undefined,
-        evalCount: undefined,
-        evalDuration: undefined,
-      },
+      translation: "",
+      model: "google/translategemma-27b-it",
+      stats: null,
     });
   });
 
@@ -299,9 +287,8 @@ describe("translate handler", () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            model: "translategemma:27b",
-            response: "\n  translated text  \n",
-            done: true,
+            model: "google/translategemma-27b-it",
+            choices: [{ index: 0, message: { role: "assistant", content: "\n  translated text  \n" }, finish_reason: null }],
           }),
       })
     );

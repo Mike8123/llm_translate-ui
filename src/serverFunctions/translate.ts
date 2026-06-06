@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { buildTranslationPrompt } from "~/lib/prompt";
 
-const OLLAMA_URL = process.env["OLLAMA_URL"] ?? "http://localhost:11434";
-const DEFAULT_MODEL = process.env["DEFAULT_MODEL"] ?? "translategemma:27b";
+const LM_STUDIO_URL = process.env["LM_STUDIO_URL"] ?? "http://localhost:1234";
+const DEFAULT_MODEL = process.env["DEFAULT_MODEL"] ?? "google/translategemma-27b-it";
 
 interface TranslateInput {
   text: string;
@@ -11,25 +11,22 @@ interface TranslateInput {
   model?: string;
 }
 
-interface OllamaGenerateRequest {
+interface OpenAIChatRequest {
   model: string;
-  prompt: string;
-  stream: boolean;
-  options?: {
-    temperature?: number;
-    num_predict?: number;
-  };
+  messages: Array<{ role: "system" | "user"; content: string }>;
+  temperature?: number;
+  max_tokens?: number;
 }
 
-interface OllamaGenerateResponse {
+interface OpenAIChoice {
+  index: number;
+  message: { role: string; content: string };
+  finish_reason: string | null;
+}
+
+interface OpenAIChatResponse {
   model: string;
-  response: string;
-  done: boolean;
-  total_duration?: number;
-  load_duration?: number;
-  prompt_eval_count?: number;
-  eval_count?: number;
-  eval_duration?: number;
+  choices: OpenAIChoice[];
 }
 
 export const translate = createServerFn({ method: "POST" })
@@ -67,14 +64,13 @@ export const translate = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const prompt = buildTranslationPrompt(data.text, data.sourceLanguage, data.targetLanguage);
 
-    const requestBody: OllamaGenerateRequest = {
+    const requestBody: OpenAIChatRequest = {
       model: data.model ?? DEFAULT_MODEL,
-      prompt,
-      stream: false,
-      options: {
-        temperature: 0.1,
-        num_predict: 4096,
-      },
+      messages: [
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.1,
+      max_tokens: 4096,
     };
 
     const controller = new AbortController();
@@ -84,7 +80,7 @@ export const translate = createServerFn({ method: "POST" })
 
     let response: Response;
     try {
-      response = await fetch(`${OLLAMA_URL}/api/generate`, {
+      response = await fetch(`${LM_STUDIO_URL}/v1/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -98,18 +94,15 @@ export const translate = createServerFn({ method: "POST" })
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Ollama API error: ${String(response.status)} - ${errorText}`);
+      throw new Error(`LM Studio API error: ${String(response.status)} - ${errorText}`);
     }
 
-    const result = (await response.json()) as OllamaGenerateResponse;
+    const result = (await response.json()) as OpenAIChatResponse;
+    const content = result.choices?.[0]?.message?.content ?? "";
 
     return {
-      translation: result.response.trim(),
+      translation: content.trim(),
       model: result.model,
-      stats: {
-        totalDuration: result.total_duration,
-        evalCount: result.eval_count,
-        evalDuration: result.eval_duration,
-      },
+      stats: null,
     };
   });

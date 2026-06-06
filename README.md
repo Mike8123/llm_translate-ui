@@ -12,10 +12,10 @@ Web interface for [TranslateGemma](https://blog.google/innovation-and-ai/technol
 
 - **55 languages** — searchable language selector with recent language pills
 - **Auto-translate** — starts translating as you type, no button needed
-- **Local inference** — no data leaves your machine, powered by [Ollama](https://ollama.ai)
+- **Local inference** — no data leaves your machine, powered by [LM Studio](https://lmstudio.ai)
 - **Remembers preferences** — last used language pair and recents restored on reload
 - **Swap languages** — flip source and target with one click
-- **Translation stats** — shows duration and token count after each translation
+- **Streaming translations** — see results appear in real-time as the model generates them
 - **Rate limiting** — built-in per-IP rate limiter for API requests
 - **Localized UI** — interface labels adapt to your browser's language
 - **Light & dark mode** — follows your system preference
@@ -32,7 +32,7 @@ services:
     ports:
       - 3000:3000
     environment:
-      - OLLAMA_URL=http://host.docker.internal:11434
+      - LM_STUDIO_URL=http://host.docker.internal:1234
     extra_hosts:
       - "host.docker.internal:host-gateway"
 ```
@@ -41,22 +41,22 @@ Access the UI at `http://localhost:3000`
 
 ## Requirements
 
-[Ollama](https://ollama.ai) running with a TranslateGemma model:
+[LM Studio](https://lmstudio.ai) with a TranslateGemma model loaded and the local server running.
 
-```bash
-ollama pull translategemma:27b   # best quality (~16GB)
-ollama pull translategemma:12b   # balanced (~7GB)
-ollama pull translategemma:4b    # fastest (~2.5GB)
-```
+1. Download LM Studio from [lmstudio.ai](https://lmstudio.ai)
+2. Search for and download `google/translategemma-27b-it` (or another compatible translation model)
+3. Load the model in LM Studio
+4. Open **Server Settings** and start the local server (default port `1234`)
+5. Set `LM_STUDIO_URL` to your LM Studio address if not on localhost
 
 ## Configuration
 
-| Variable        | Default                  | Description                          |
-| --------------- | ------------------------ | ------------------------------------ |
-| `OLLAMA_URL`    | `http://localhost:11434` | Ollama API endpoint                  |
-| `DEFAULT_MODEL` | `translategemma:27b`     | Model to use (`27b`, `12b`, or `4b`) |
-| `PORT`          | `3000`                   | Server port                          |
-| `HOST`          | `0.0.0.0`                | Server host                          |
+| Variable        | Default                              | Description                                          |
+| --------------- | ------------------------------------ | ---------------------------------------------------- |
+| `LM_STUDIO_URL` | `http://localhost:1234`              | LM Studio OpenAI-compatible API endpoint             |
+| `DEFAULT_MODEL` | `google/translategemma-27b-it`       | Model name (must match a loaded model in LM Studio)  |
+| `PORT`          | `3000`                               | Server port                                          |
+| `HOST`          | `0.0.0.0`                            | Server host                                          |
 
 ## Supported Languages
 
