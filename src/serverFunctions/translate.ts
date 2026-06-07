@@ -13,7 +13,7 @@ interface TranslateInput {
 
 interface OpenAIChatRequest {
   model: string;
-  messages: Array<{ role: "system" | "user"; content: string }>;
+  messages: { role: "system" | "user"; content: string | unknown[] }[];
   temperature?: number;
   max_tokens?: number;
 }
@@ -64,11 +64,26 @@ export const translate = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const prompt = buildTranslationPrompt(data.text, data.sourceLanguage, data.targetLanguage);
 
+    const modelName = data.model ?? DEFAULT_MODEL;
+    const isTranslateGemma = modelName.toLowerCase().includes("translategemma");
+
     const requestBody: OpenAIChatRequest = {
-      model: data.model ?? DEFAULT_MODEL,
-      messages: [
-        { role: "user", content: prompt },
-      ],
+      model: modelName,
+      messages: isTranslateGemma
+        ? [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  source_lang_code: data.sourceLanguage,
+                  target_lang_code: data.targetLanguage,
+                  text: prompt,
+                },
+              ],
+            },
+          ]
+        : [{ role: "user", content: prompt }],
       temperature: 0.1,
       max_tokens: 4096,
     };
@@ -98,7 +113,7 @@ export const translate = createServerFn({ method: "POST" })
     }
 
     const result = (await response.json()) as OpenAIChatResponse;
-    const content = result.choices?.[0]?.message?.content ?? "";
+    const content = result.choices[0]?.message.content ?? "";
 
     return {
       translation: content.trim(),

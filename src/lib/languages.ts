@@ -8,6 +8,7 @@ export const languages: Language[] = [
   { code: "en", name: "English", nativeName: "English" },
   { code: "ar_EG", name: "Arabic (Egypt)", nativeName: "العربية (مصر)" },
   { code: "ar_SA", name: "Arabic (Saudi Arabia)", nativeName: "العربية (السعودية)" },
+  { code: "hy_AM", name: "Armenian", nativeName: "Հայերեն" },
   { code: "bg_BG", name: "Bulgarian", nativeName: "Български" },
   { code: "bn_IN", name: "Bengali", nativeName: "বাংলা" },
   { code: "ca_ES", name: "Catalan", nativeName: "Català" },

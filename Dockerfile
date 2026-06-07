@@ -9,7 +9,7 @@ RUN npm ci
 
 COPY . .
 
-RUN npm run build
+RUN rm -rf dist .vite node_modules/.vite && npm run build
 
 # Production stage
 FROM node:lts-alpine AS runner

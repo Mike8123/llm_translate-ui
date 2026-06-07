@@ -16,8 +16,12 @@ export const ModelContext = createContext<ModelContextValue>({
   selectedModel: null,
   isLoading: false,
   error: null,
-  setSelectedModel: () => {},
-  setAvailableModels: () => {},
+  setSelectedModel: () => {
+    // no-op
+  },
+  setAvailableModels: () => {
+    // no-op
+  },
 });
 
 export function useModel() {
@@ -27,19 +31,27 @@ export function useModel() {
 export function ModelProvider({ children }: { children: React.ReactNode }) {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModelState] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [_isLoading, _setIsLoading] = useState(false);
+  const [error, _setError] = useState<string | null>(null);
+
+  const [hydrated, setHydrated] = useState(false);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration from external system (localStorage) is the correct pattern
         setSelectedModelState(stored);
       }
     } catch {
       // localStorage unavailable
     }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration flag must be set after external system read
+    setHydrated(true);
   }, []);
 
   const setSelectedModel = useCallback((model: string) => {
@@ -55,8 +67,8 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
     <ModelContext.Provider
       value={{
         availableModels,
-        selectedModel,
-        isLoading,
+        selectedModel: hydrated ? selectedModel : null,
+        isLoading: _isLoading,
         error,
         setSelectedModel,
         setAvailableModels,

@@ -46,12 +46,39 @@ export const translateStream = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const prompt = buildTranslationPrompt(data.text, data.sourceLanguage, data.targetLanguage);
 
+    const rawModel = data.model ?? DEFAULT_MODEL;
+    const modelNameLower = rawModel.toLowerCase();
+
+    // Detect TranslateGemma models by multiple possible name patterns
+    const isTranslateGemma =
+      modelNameLower.includes("translategemma") ||
+      modelNameLower.includes("translate-gemma") ||
+      modelNameLower.includes("gemma-translate");
+
+    console.log(
+      `[translateStream] model="${rawModel}", isTranslateGemma=${String(isTranslateGemma)}`
+    );
+
     const response = await fetch(`${LM_STUDIO_URL}/v1/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model: data.model ?? DEFAULT_MODEL,
-        messages: [{ role: "user", content: prompt }],
+        messages: (data.model ?? DEFAULT_MODEL).toLowerCase().includes("translategemma")
+          ? [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    source_lang_code: data.sourceLanguage,
+                    target_lang_code: data.targetLanguage,
+                    text: prompt,
+                  },
+                ],
+              },
+            ]
+          : [{ role: "user", content: prompt }],
         stream: true,
         temperature: 0.1,
         max_tokens: 4096,

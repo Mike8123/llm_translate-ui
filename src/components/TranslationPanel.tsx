@@ -26,6 +26,7 @@ export function TranslationPanel() {
   const labelChars = useLabel("label.chars");
   const titleCopy = useLabel("title.copy");
   const titleCopied = useLabel("title.copied");
+  const translateButtonLabel = useLabel("button.translate");
 
   const { selectedModel } = useModel();
 
@@ -38,7 +39,7 @@ export function TranslationPanel() {
     setStats,
     startTranslation,
     abort,
-  } = useStreamingTranslation(selectedModel);
+  } = useStreamingTranslation(selectedModel ?? undefined);
 
   const [isWideView, setIsWideView] = useState(false);
   useEffect(() => {
@@ -155,6 +156,8 @@ export function TranslationPanel() {
     sourceText,
     translatedText,
     abort,
+    setSourceLanguage,
+    setTargetLanguage,
     setTranslatedText,
     setError,
     setStats,
@@ -168,36 +171,6 @@ export function TranslationPanel() {
     setError(null);
     setStats(null);
   }, [abort, setTranslatedText, setError, setStats]);
-
-  // Debounced auto-translate on text change (500ms).
-  // startTranslation/sourceLanguage/targetLanguage are intentionally omitted —
-  // including them would reset the debounce timer on each keystroke.
-  useEffect(() => {
-    if (!sourceText.trim() || !targetLanguage) {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      abort();
-      setTranslatedText("");
-      setError(null);
-      setStats(null);
-      return;
-    }
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      startTranslation(sourceText, sourceLanguage, targetLanguage);
-    }, 500);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [sourceText]);
-
-  // Immediate auto-translate on language change (if text exists).
-  // startTranslation and sourceText are intentionally omitted — including them
-  // would duplicate the debounced effect above on every keystroke.
-  useEffect(() => {
-    if (!sourceText.trim() || !targetLanguage) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    startTranslation(sourceText, sourceLanguage, targetLanguage);
-  }, [sourceLanguage, targetLanguage]);
 
   // Auto-resize textarea height based on content
   useEffect(() => {
@@ -328,6 +301,17 @@ export function TranslationPanel() {
             className="min-h-48 w-full resize-none overflow-hidden bg-transparent p-5 text-lg focus:outline-none"
           />
           <div className="mt-auto flex h-10 items-center justify-end gap-3 px-4">
+            <button
+              type="button"
+              onClick={() => {
+                if (sourceText.trim()) {
+                  startTranslation(sourceText, sourceLanguage, targetLanguage);
+                }
+              }}
+              className={`rounded-full bg-blue-600 px-4 py-1 text-sm font-medium text-white transition-colors hover:bg-blue-700 ${!sourceText ? "invisible" : ""}`}
+            >
+              {translateButtonLabel}
+            </button>
             <button
               type="button"
               onClick={handleClear}
